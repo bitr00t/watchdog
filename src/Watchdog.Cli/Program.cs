@@ -1,18 +1,23 @@
+using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Watchdog.Cli;
 using Watchdog.Core;
 
-// Top-level statements: no class, no Main method, no string array parameter. The compiler
-// generates the scaffolding. args, await and return (as the exit code) are still available.
+// Composition root. Everything below only registers types; nothing is constructed until the
+// host resolves the first hosted service.
 
 const string DefaultConfigurationPath = "watchdog.json";
 
-// args is available without declaring it. The first argument overrides the config path.
 var configurationPath = args.Length > 0 ? args[0] : DefaultConfigurationPath;
 
 WatchdogConfiguration configuration;
 
 try
 {
+    // Loaded before the host exists on purpose: a broken configuration should produce one
+    // clear message and exit code 2, not a DI resolution failure wrapped in a stack trace.
     configuration = await ConfigurationLoader.LoadAsync(configurationPath);
 }
 catch (ConfigurationException exception)
@@ -21,87 +26,66 @@ catch (ConfigurationException exception)
     return 2;
 }
 
-// Exactly one HttpClient for the entire lifetime of the application.
-using var httpClient = new HttpClient
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.SingleLine = true;
+    options.TimestampFormat = "HH:mm:ss ";
+});
+
+// The configuration object and its parts are registered separately, so a consumer can ask
+// for exactly the slice it needs instead of taking the whole tree and reaching into it.
+builder.Services.AddSingleton(configuration);
+builder.Services.AddSingleton(configuration.Options);
+builder.Services.AddSingleton(configuration.Retry);
+
+builder.Services.AddSingleton(new CheckHistory(capacityPerEndpoint: 50));
+
+// One HttpClient for the whole process. IHttpClientFactory exists mainly to rotate handlers
+// so that long lived clients do not hold on to stale DNS entries; PooledConnectionLifetime
+// solves the same problem directly and keeps Microsoft.Extensions.Http out of the picture.
+builder.Services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    AutomaticDecompression = DecompressionMethods.All,
+})
 {
     // The timeout is applied per endpoint inside the probe, not globally on the client.
     Timeout = System.Threading.Timeout.InfiniteTimeSpan,
-};
+});
 
-// The retry decorator wraps the plain probe. Neither the engine nor the probe knows about
-// the other's existence, which is the whole point of IEndpointProbe.
-IEndpointProbe probe = new ResilientEndpointProbe(
-    new HttpEndpointProbe(httpClient),
-    configuration.Retry.MaxAttempts,
-    configuration.Retry.Delay);
+builder.Services.AddSingleton<HttpEndpointProbe>();
 
-var engine = new WatchdogEngine(probe, configuration.Options);
-var history = new CheckHistory(capacityPerEndpoint: 50);
-
-// Two subscribers that know nothing about each other. Removing either one changes nothing
-// about the engine or the other subscriber.
-using var reporter = new ConsoleReporter(engine);
-using var logger = new FileLogger(engine, "watchdog.log");
-
-// Ctrl+C shuts down cleanly instead of killing the process.
-using var applicationLifetime = new CancellationTokenSource();
-Console.CancelKeyPress += (_, eventArgs) =>
+// The built-in container has no decorator support, so the wrapping is spelled out in a
+// factory. Third party containers and Scrutor add a Decorate() call for this; the manual
+// version costs three lines and keeps the dependency list short.
+builder.Services.AddSingleton<IEndpointProbe>(provider =>
 {
-    eventArgs.Cancel = true;
-    applicationLifetime.Cancel();
-};
+    var retry = provider.GetRequiredService<RetryConfiguration>();
 
-static void PrintSummary(CheckHistory history)
-{
-    var summaries = history.Summarize();
+    return new ResilientEndpointProbe(
+        provider.GetRequiredService<HttpEndpointProbe>(),
+        retry.MaxAttempts,
+        retry.Delay);
+});
 
-    if (summaries.Count == 0)
-    {
-        return;
-    }
+// WatchdogEngine keeps the last known status per endpoint, so it has to be a singleton.
+// Registering it as transient would hand every consumer its own state and silently break
+// the StatusChanged event.
+builder.Services.AddSingleton<WatchdogEngine>();
 
-    Console.WriteLine("Summary");
-    Console.WriteLine($"{"endpoint",-18} {"checks",6} {"ok",7} {"avg",10} {"p95",10}  state");
+// Registration order is start order. Both subscribers have to be attached before the worker
+// produces its first round; shutdown runs in reverse, so they detach after it finishes.
+builder.Services.AddHostedService<ConsoleReporter>();
+builder.Services.AddHostedService<FileLogger>();
+builder.Services.AddHostedService<WatchdogWorker>();
 
-    foreach (var statistics in summaries)
-    {
-        Console.WriteLine(
-            $"{statistics.Id.Value,-18} {statistics.Total,6} {statistics.SuccessRate,7:P0} "
-            + $"{statistics.AverageLatency.Milliseconds,10:F1} {statistics.P95Latency.Milliseconds,10:F1}  "
-            + (statistics.IsHealthy ? "healthy" : $"{statistics.ConsecutiveFailures} failing in a row"));
-    }
-}
+using var host = builder.Build();
 
-Console.WriteLine(
-    $"Watching {configuration.Endpoints.Count} endpoints from '{configurationPath}' "
-    + $"every {configuration.Options.Interval.TotalSeconds:F0} s");
-Console.WriteLine("Press Ctrl+C to stop.");
-Console.WriteLine();
+// RunAsync blocks until the host stops, either because the worker asked for shutdown or
+// because Ctrl+C was pressed. The host installs that handler itself.
+await host.RunAsync();
 
-var failedRounds = 0;
-
-try
-{
-    // Rendering moved into ConsoleReporter, so this loop only keeps the history and the
-    // exit code. await foreach still drives the schedule: the engine starts the next round
-    // only once this loop asks for it.
-    await foreach (var round in engine.RunAsync(configuration.Endpoints, applicationLifetime.Token))
-    {
-        history.Add(round);
-
-        if (!round.AllSucceeded)
-        {
-            failedRounds++;
-        }
-    }
-}
-catch (OperationCanceledException)
-{
-    // Ctrl+C during a running round cancels the in-flight requests. Cancellation between
-    // two rounds ends the enumeration without an exception.
-    Console.WriteLine("Stopped.");
-}
-
-PrintSummary(history);
-
-return failedRounds == 0 ? 0 : 1;
+return Environment.ExitCode;
