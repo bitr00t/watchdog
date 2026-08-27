@@ -21,6 +21,7 @@ internal sealed class WatchdogWorker(
     WatchdogEngine engine,
     CheckHistory history,
     StatisticsSnapshot snapshot,
+    ICheckResultStore store,
     WatchdogConfiguration configuration,
     IHostApplicationLifetime lifetime,
     ILogger<WatchdogWorker> logger) : BackgroundService
@@ -43,6 +44,10 @@ internal sealed class WatchdogWorker(
                 // Publishing here keeps the history single threaded: the metrics endpoint
                 // reads the snapshot instead of the mutable history.
                 snapshot.Update(history.Summarize());
+
+                // Awaited rather than raised as an event: a failed write should be noticed,
+                // and an event handler returning void cannot report one.
+                await store.SaveAsync(round, stoppingToken);
 
                 if (!round.AllSucceeded)
                 {

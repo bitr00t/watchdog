@@ -15,6 +15,9 @@
 
 # Runtime output
 *.log
+*.db
+*.db-shm
+*.db-wal
 
 # Test results
 [Tt]est[Rr]esult*/

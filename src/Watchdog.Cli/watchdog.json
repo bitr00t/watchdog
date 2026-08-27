@@ -13,6 +13,12 @@
     "path": "/metrics"
   },
 
+  "storage": {
+    "enabled": true,
+    "databasePath": "watchdog.db",
+    "retentionDays": 7
+  },
+
   "retry": {
     "maxAttempts": 2,
     "delayMilliseconds": 250
