@@ -27,4 +27,13 @@ public sealed record EndpointConfig
     /// <c>Optional</c> it costs neither an allocation nor an unwrapping call.
     /// </remarks>
     public string? BodyContains { get; init; }
+
+    /// <summary>
+    /// Optional typed assertion over the response body, or <c>null</c> to skip it.
+    /// </summary>
+    /// <remarks>
+    /// Runs after <see cref="BodyContains"/>, so a cheap substring check can rule out an
+    /// obviously wrong payload before it is parsed.
+    /// </remarks>
+    public IBodyAssertion? BodyAssertion { get; init; }
 }
