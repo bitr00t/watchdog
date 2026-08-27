@@ -42,6 +42,7 @@ builder.Services.AddSingleton(configuration.Options);
 builder.Services.AddSingleton(configuration.Retry);
 
 builder.Services.AddSingleton(new CheckHistory(capacityPerEndpoint: 50));
+builder.Services.AddSingleton<StatisticsSnapshot>();
 
 // One HttpClient for the whole process. IHttpClientFactory exists mainly to rotate handlers
 // so that long lived clients do not hold on to stale DNS entries; PooledConnectionLifetime
@@ -80,6 +81,12 @@ builder.Services.AddSingleton<WatchdogEngine>();
 // produces its first round; shutdown runs in reverse, so they detach after it finishes.
 builder.Services.AddHostedService<ConsoleReporter>();
 builder.Services.AddHostedService<FileLogger>();
+
+if (configuration.Metrics.Enabled)
+{
+    builder.Services.AddHostedService<MetricsServer>();
+}
+
 builder.Services.AddHostedService<WatchdogWorker>();
 
 using var host = builder.Build();

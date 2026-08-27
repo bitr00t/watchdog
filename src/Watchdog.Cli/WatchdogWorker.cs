@@ -20,6 +20,7 @@ namespace Watchdog.Cli;
 internal sealed class WatchdogWorker(
     WatchdogEngine engine,
     CheckHistory history,
+    StatisticsSnapshot snapshot,
     WatchdogConfiguration configuration,
     IHostApplicationLifetime lifetime,
     ILogger<WatchdogWorker> logger) : BackgroundService
@@ -38,6 +39,10 @@ internal sealed class WatchdogWorker(
             await foreach (var round in engine.RunAsync(configuration.Endpoints, stoppingToken))
             {
                 history.Add(round);
+
+                // Publishing here keeps the history single threaded: the metrics endpoint
+                // reads the snapshot instead of the mutable history.
+                snapshot.Update(history.Summarize());
 
                 if (!round.AllSucceeded)
                 {
