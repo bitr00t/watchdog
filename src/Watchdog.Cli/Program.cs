@@ -10,7 +10,16 @@ using var httpClient = new HttpClient
     Timeout = System.Threading.Timeout.InfiniteTimeSpan,
 };
 
-var probe = new HttpEndpointProbe(httpClient);
+var options = new WatchdogOptions
+{
+    Interval = TimeSpan.FromSeconds(10),
+    MaxConcurrency = 4,
+
+    // Set this to null to keep going until Ctrl+C.
+    Rounds = 3,
+};
+
+var engine = new WatchdogEngine(new HttpEndpointProbe(httpClient), options);
 
 EndpointConfig[] endpoints =
 [
@@ -55,22 +64,41 @@ static string Format(CheckResult result)
     return result.FailureReason is null ? line : $"{line}  <- {result.FailureReason}";
 }
 
-Console.WriteLine($"Probing {endpoints.Length} endpoints");
+Console.WriteLine($"Watching {endpoints.Length} endpoints every {options.Interval.TotalSeconds:F0} s");
+Console.WriteLine("Press Ctrl+C to stop.");
 Console.WriteLine();
 
-var results = new List<CheckResult>(endpoints.Length);
+var failedRounds = 0;
 
-// Step 1 runs sequentially on purpose. Parallel execution arrives in step 2.
-foreach (var endpoint in endpoints)
+try
 {
-    var result = await probe.ProbeAsync(endpoint, applicationLifetime.Token);
-    results.Add(result);
-    Console.WriteLine(Format(result));
+    // await foreach pulls one round at a time. The engine only starts the next round once
+    // this loop asks for it, so a slow consumer cannot pile up work in the background.
+    await foreach (var round in engine.RunAsync(endpoints, applicationLifetime.Token))
+    {
+        Console.WriteLine(
+            $"Round {round.Number} at {round.StartedAt.ToLocalTime():HH:mm:ss}, "
+            + $"{round.FailureCount} of {round.Results.Count} failed, "
+            + $"slowest {round.SlowestLatency}");
+
+        foreach (var result in round.Results)
+        {
+            Console.WriteLine(Format(result));
+        }
+
+        Console.WriteLine();
+
+        if (!round.AllSucceeded)
+        {
+            failedRounds++;
+        }
+    }
+}
+catch (OperationCanceledException)
+{
+    // Ctrl+C during a running round cancels the in-flight requests. Cancellation between
+    // two rounds ends the enumeration without an exception.
+    Console.WriteLine("Stopped.");
 }
 
-var failed = results.Count(result => !result.IsSuccess);
-
-Console.WriteLine();
-Console.WriteLine($"{results.Count - failed} of {results.Count} checks succeeded.");
-
-return failed == 0 ? 0 : 1;
+return failedRounds == 0 ? 0 : 1;
