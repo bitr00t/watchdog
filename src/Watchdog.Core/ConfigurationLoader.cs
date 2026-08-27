@@ -75,6 +75,7 @@ public static class ConfigurationLoader
         var endpoints = MapEndpoints(file, errors);
         var options = MapOptions(file, errors);
         var retry = MapRetry(file.Retry, errors);
+        var metrics = MapMetrics(file.Metrics, errors);
 
         if (errors.Count > 0)
         {
@@ -87,6 +88,7 @@ public static class ConfigurationLoader
             Retry = retry,
             Endpoints = endpoints,
             LogFilePath = string.IsNullOrWhiteSpace(file.LogFile) ? "watchdog.log" : file.LogFile,
+            Metrics = metrics,
         };
     }
 
@@ -138,6 +140,29 @@ public static class ConfigurationLoader
         {
             MaxAttempts = Math.Max(maxAttempts, 1),
             Delay = TimeSpan.FromMilliseconds(Math.Max(delayMs, 0)),
+        };
+    }
+
+    private static MetricsConfiguration MapMetrics(MetricsFile? metrics, List<string> errors)
+    {
+        var port = metrics?.Port ?? 9464;
+        var path = string.IsNullOrWhiteSpace(metrics?.Path) ? "/metrics" : metrics.Path;
+
+        if (port is < 1 or > 65535)
+        {
+            errors.Add("metrics.port must be between 1 and 65535.");
+        }
+
+        if (!path.StartsWith('/'))
+        {
+            errors.Add("metrics.path must start with a slash.");
+        }
+
+        return new MetricsConfiguration
+        {
+            Enabled = metrics?.Enabled ?? false,
+            Port = port is >= 1 and <= 65535 ? port : 9464,
+            Path = path.StartsWith('/') ? path : "/metrics",
         };
     }
 
@@ -265,7 +290,18 @@ public static class ConfigurationLoader
 
         public RetryFile? Retry { get; init; }
 
+        public MetricsFile? Metrics { get; init; }
+
         public IReadOnlyList<EndpointFile?>? Endpoints { get; init; }
+    }
+
+    internal sealed record MetricsFile
+    {
+        public bool? Enabled { get; init; }
+
+        public int? Port { get; init; }
+
+        public string? Path { get; init; }
     }
 
     internal sealed record RetryFile

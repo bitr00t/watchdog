@@ -5,6 +5,14 @@
   "rounds": 3,
   "logFile": "watchdog.log",
 
+  // The endpoint is scraped at http://localhost:9464/metrics.
+  // Remove "rounds" above to keep the process, and the endpoint, running.
+  "metrics": {
+    "enabled": true,
+    "port": 9464,
+    "path": "/metrics"
+  },
+
   "retry": {
     "maxAttempts": 2,
     "delayMilliseconds": 250

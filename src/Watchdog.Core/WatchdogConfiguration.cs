@@ -15,6 +15,20 @@ public sealed record WatchdogConfiguration
     /// File the check log is appended to.
     /// </summary>
     public required string LogFilePath { get; init; }
+
+    public required MetricsConfiguration Metrics { get; init; }
+}
+
+/// <summary>
+/// Settings of the Prometheus scrape endpoint.
+/// </summary>
+public sealed record MetricsConfiguration
+{
+    public bool Enabled { get; init; }
+
+    public int Port { get; init; } = 9464;
+
+    public string Path { get; init; } = "/metrics";
 }
 
 /// <summary>

@@ -22,6 +22,9 @@ public sealed class ConfigurationLoaderTests
         Assert.Null(configuration.Options.Rounds);
         Assert.Equal(2, configuration.Retry.MaxAttempts);
         Assert.Equal("watchdog.log", configuration.LogFilePath);
+        Assert.False(configuration.Metrics.Enabled);
+        Assert.Equal(9464, configuration.Metrics.Port);
+        Assert.Equal("/metrics", configuration.Metrics.Path);
 
         var endpoint = Assert.Single(configuration.Endpoints);
         Assert.Equal(200, endpoint.ExpectedStatus);
@@ -39,6 +42,7 @@ public sealed class ConfigurationLoaderTests
               "maxConcurrency": 3,
               "rounds": 2,
               "logFile": "checks.log",
+              "metrics": { "enabled": true, "port": 9500, "path": "/stats" },
               "retry": { "maxAttempts": 4, "delayMilliseconds": 100 },
               "endpoints": [
                 {
@@ -60,6 +64,9 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal(4, configuration.Retry.MaxAttempts);
         Assert.Equal(TimeSpan.FromMilliseconds(100), configuration.Retry.Delay);
         Assert.Equal("checks.log", configuration.LogFilePath);
+        Assert.True(configuration.Metrics.Enabled);
+        Assert.Equal(9500, configuration.Metrics.Port);
+        Assert.Equal("/stats", configuration.Metrics.Path);
 
         var endpoint = Assert.Single(configuration.Endpoints);
         Assert.Equal("a", endpoint.Id.Value);
@@ -104,6 +111,22 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains(exception.Errors, error => error.Contains("endpoints[0].id"));
         Assert.Contains(exception.Errors, error => error.Contains("endpoints[1].url"));
         Assert.Contains(exception.Errors, error => error.Contains("endpoints[2].expectedStatus"));
+    }
+
+    [Fact]
+    public void Parse_rejects_an_invalid_metrics_section()
+    {
+        var exception = Assert.Throws<ConfigurationException>(() => ConfigurationLoader.Parse("""
+            {
+              "metrics": { "port": 70000, "path": "stats" },
+              "endpoints": [
+                { "id": "a", "url": "https://example.com/" }
+              ]
+            }
+            """));
+
+        Assert.Contains(exception.Errors, error => error.Contains("metrics.port"));
+        Assert.Contains(exception.Errors, error => error.Contains("metrics.path"));
     }
 
     [Fact]
