@@ -28,16 +28,44 @@ dotnet restore
 dotnet build
 dotnet test
 dotnet run --project src/Watchdog.Cli
+dotnet run --project src/Watchdog.Cli -- C:\path\to\other.json
 ```
 
-The sample run performs three rounds, prints a summary and exits with code 1 on purpose:
-two of the three demo endpoints are expected to fail. Ctrl+C stops it earlier.
+The endpoints come from `watchdog.json`, which is copied next to the executable on build.
+The first command line argument overrides the path. The sample configuration performs three
+rounds, prints a summary and exits with code 1 on purpose: two of its four endpoints are
+expected to fail. Ctrl+C stops it earlier. An invalid configuration exits with code 2 and
+lists every problem it found.
+
+## Configuration
+
+```json
+{
+  "intervalSeconds": 10,
+  "maxConcurrency": 4,
+  "rounds": 3,
+  "retry": { "maxAttempts": 2, "delayMilliseconds": 250 },
+  "endpoints": [
+    {
+      "id": "github-status",
+      "url": "https://www.githubstatus.com/api/v2/status.json",
+      "jsonPath": "/status/indicator",
+      "jsonEquals": "none"
+    }
+  ]
+}
+```
+
+Only `endpoints` with an `id` and a `url` is required; everything else has a default.
+Per endpoint, `expectedStatus`, `timeoutSeconds`, `bodyContains` and the pair
+`jsonPath`/`jsonEquals` are optional. Omitting `rounds` runs until cancelled. Comments and
+trailing commas are tolerated.
 
 ## Status
 
-Step 5, feature complete for the original scope. On top of step 4, an endpoint can carry a
-typed body assertion: the response is deserialized into a caller supplied type and checked
-with a predicate, with per type metadata cached in a generic static class.
+Step 6: the endpoint list and all scheduling settings come from a configuration file that is
+validated on load, reporting every problem at once. Body checks are available both as a
+compile time typed assertion in code and as a path based one from configuration.
 
-Possible next steps: a configuration file instead of the hard coded endpoint list, an HTTP
-or Prometheus endpoint exposing the statistics, and persistence for the history.
+Possible next steps: dependency injection with a hosted service, an HTTP or Prometheus
+endpoint exposing the statistics, and persistence for the history.

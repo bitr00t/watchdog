@@ -10,4 +10,10 @@
     <ProjectReference Include="..\Watchdog.Core\Watchdog.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Ships next to the executable. PreserveNewest copies it again whenever it changes,
+         so editing the file does not require a rebuild of the project. -->
+    <None Update="watchdog.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
