@@ -1,41 +1,55 @@
 using System.Globalization;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Watchdog.Core;
 
 namespace Watchdog.Cli;
 
 /// <summary>
-/// Appends one line per check to a log file.
+/// Appends one line per check to the configured log file.
 /// </summary>
 /// <remarks>
 /// The second subscriber exists to make the point of events concrete: neither the engine nor
 /// the console reporter knows this class, and adding or removing it changes nothing else.
-/// With a plain callback parameter the engine would have to decide up front how many
-/// consumers it supports.
+///
+/// Note the split between startup and runtime failures. Opening the file happens in
+/// <see cref="StartAsync"/> and is allowed to throw, which aborts host startup with a clear
+/// message. A write that fails later is contained, because losing the log is not a reason to
+/// stop monitoring.
 /// </remarks>
-internal sealed class FileLogger : IDisposable
+internal sealed class FileLogger(
+    WatchdogEngine engine,
+    WatchdogConfiguration configuration,
+    ILogger<FileLogger> logger) : IHostedService, IDisposable
 {
-    private readonly WatchdogEngine _engine;
-    private readonly StreamWriter _writer;
+    private StreamWriter? _writer;
 
-    public FileLogger(WatchdogEngine engine, string path)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(engine);
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        _writer = new StreamWriter(configuration.LogFilePath, append: true) { AutoFlush = true };
+        engine.RoundCompleted += OnRoundCompleted;
 
-        _engine = engine;
-        _writer = new StreamWriter(path, append: true) { AutoFlush = true };
+        logger.LogInformation("Writing check log to {Path}", configuration.LogFilePath);
 
-        _engine.RoundCompleted += OnRoundCompleted;
+        return Task.CompletedTask;
     }
 
-    public void Dispose()
+    public Task StopAsync(CancellationToken cancellationToken)
     {
-        _engine.RoundCompleted -= OnRoundCompleted;
-        _writer.Dispose();
+        engine.RoundCompleted -= OnRoundCompleted;
+
+        return Task.CompletedTask;
     }
+
+    public void Dispose() => _writer?.Dispose();
 
     private void OnRoundCompleted(object? sender, RoundCompletedEventArgs eventArgs)
     {
+        if (_writer is not { } writer)
+        {
+            return;
+        }
+
         try
         {
             foreach (var result in eventArgs.Round.Results)
@@ -49,16 +63,15 @@ internal sealed class FileLogger : IDisposable
                 var status = result.StatusCode?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
                 var latency = result.Latency.Milliseconds.ToString("F1", CultureInfo.InvariantCulture);
 
-                _writer.WriteLine(
+                writer.WriteLine(
                     $"{timestamp};{eventArgs.Round.Number};{result.Id.Value};{outcome};{status};{latency};{result.FailureReason}");
             }
         }
         catch (IOException exception)
         {
-            // A broken sink must not take the monitoring down with it. Handlers run
-            // synchronously and in sequence, so an exception escaping here would also stop
-            // every handler that subscribed after this one.
-            Console.Error.WriteLine($"Log write failed: {exception.Message}");
+            // Handlers run synchronously and in sequence, so an exception escaping here would
+            // also stop every handler that subscribed after this one.
+            logger.LogWarning("Log write failed: {Reason}", exception.Message);
         }
     }
 }

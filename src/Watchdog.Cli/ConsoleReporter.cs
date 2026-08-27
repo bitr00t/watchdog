@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using Watchdog.Core;
 
 namespace Watchdog.Cli;
@@ -6,29 +7,30 @@ namespace Watchdog.Cli;
 /// Renders rounds and status transitions to the console.
 /// </summary>
 /// <remarks>
-/// Subscribing in the constructor and unsubscribing in <see cref="Dispose"/> is the pattern
-/// to internalize: an event holds a strong reference to every subscriber, so a handler that
-/// is never removed keeps its object alive as long as the publisher lives. That is the
-/// classic managed memory leak in C#, and it has no direct Java counterpart because
-/// listeners there are ordinary collection entries you remove just as explicitly.
+/// Implemented as an <see cref="IHostedService"/> so the host owns the subscription window:
+/// <see cref="StartAsync"/> attaches the handlers, <see cref="StopAsync"/> detaches them.
+/// Hosted services start in registration order and stop in reverse, which is exactly what
+/// this needs, since the reporter has to be listening before the worker produces its first
+/// round and must still be listening while the worker winds down.
 /// </remarks>
-internal sealed class ConsoleReporter : IDisposable
+internal sealed class ConsoleReporter(WatchdogEngine engine) : IHostedService
 {
-    private readonly WatchdogEngine _engine;
-
-    public ConsoleReporter(WatchdogEngine engine)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(engine);
+        engine.RoundCompleted += OnRoundCompleted;
+        engine.StatusChanged += OnStatusChanged;
 
-        _engine = engine;
-        _engine.RoundCompleted += OnRoundCompleted;
-        _engine.StatusChanged += OnStatusChanged;
+        return Task.CompletedTask;
     }
 
-    public void Dispose()
+    public Task StopAsync(CancellationToken cancellationToken)
     {
-        _engine.RoundCompleted -= OnRoundCompleted;
-        _engine.StatusChanged -= OnStatusChanged;
+        // Detaching still matters even at shutdown: the engine is a singleton and keeps a
+        // strong reference to every handler that was never removed.
+        engine.RoundCompleted -= OnRoundCompleted;
+        engine.StatusChanged -= OnStatusChanged;
+
+        return Task.CompletedTask;
     }
 
     private static void OnRoundCompleted(object? sender, RoundCompletedEventArgs eventArgs)
