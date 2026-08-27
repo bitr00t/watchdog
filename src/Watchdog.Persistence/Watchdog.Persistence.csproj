@@ -9,6 +9,10 @@
     <ProjectReference Include="..\Watchdog.Core\Watchdog.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
+  </ItemGroup>
+
   <!--
     Add the provider with:
       dotnet add src\Watchdog.Persistence package Microsoft.EntityFrameworkCore.Sqlite
