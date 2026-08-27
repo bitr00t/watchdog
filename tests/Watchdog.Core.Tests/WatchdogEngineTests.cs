@@ -72,7 +72,7 @@ public sealed class WatchdogEngineTests
 
         var probe = new FakeEndpointProbe(async (endpoint, cancellationToken) =>
         {
-            if (Interlocked.Increment(ref arrived) == endpoints.Count)
+            if (Interlocked.Increment(ref arrived) == endpoints.Length)
             {
                 allArrived.SetResult();
             }

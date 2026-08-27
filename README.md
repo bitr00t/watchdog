@@ -13,7 +13,7 @@ methods.
 | Project | Purpose |
 | --- | --- |
 | `src/Watchdog.Core` | Domain logic, no console output |
-| `src/Watchdog.Cli` | Entry point and rendering |
+| `src/Watchdog.Cli` | Host, composition root and hosted services |
 | `tests/Watchdog.Core.Tests` | xUnit tests against a WireMock server |
 
 ## Requirements
@@ -44,6 +44,7 @@ lists every problem it found.
   "intervalSeconds": 10,
   "maxConcurrency": 4,
   "rounds": 3,
+  "logFile": "watchdog.log",
   "retry": { "maxAttempts": 2, "delayMilliseconds": 250 },
   "endpoints": [
     {
@@ -63,9 +64,10 @@ trailing commas are tolerated.
 
 ## Status
 
-Step 6: the endpoint list and all scheduling settings come from a configuration file that is
-validated on load, reporting every problem at once. Body checks are available both as a
-compile time typed assertion in code and as a path based one from configuration.
+Step 7: the application runs on the generic host. Program.cs is a pure composition root, the
+engine and its collaborators are resolved from the service container, and the console
+reporter, the file logger and the monitoring loop are three hosted services whose lifetime
+the host owns.
 
-Possible next steps: dependency injection with a hosted service, an HTTP or Prometheus
-endpoint exposing the statistics, and persistence for the history.
+Possible next steps: an HTTP or Prometheus endpoint exposing the statistics, persistence for
+the history, and hot reloading the configuration through IOptionsMonitor.

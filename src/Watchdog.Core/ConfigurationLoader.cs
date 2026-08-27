@@ -86,6 +86,7 @@ public static class ConfigurationLoader
             Options = options,
             Retry = retry,
             Endpoints = endpoints,
+            LogFilePath = string.IsNullOrWhiteSpace(file.LogFile) ? "watchdog.log" : file.LogFile,
         };
     }
 
@@ -259,6 +260,8 @@ public static class ConfigurationLoader
         public int? MaxConcurrency { get; init; }
 
         public int? Rounds { get; init; }
+
+        public string? LogFile { get; init; }
 
         public RetryFile? Retry { get; init; }
 

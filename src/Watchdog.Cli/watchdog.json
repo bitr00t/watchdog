@@ -3,6 +3,7 @@
   "intervalSeconds": 10,
   "maxConcurrency": 4,
   "rounds": 3,
+  "logFile": "watchdog.log",
 
   "retry": {
     "maxAttempts": 2,

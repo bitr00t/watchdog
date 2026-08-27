@@ -10,6 +10,11 @@ public sealed record WatchdogConfiguration
     public required RetryConfiguration Retry { get; init; }
 
     public required IReadOnlyList<EndpointConfig> Endpoints { get; init; }
+
+    /// <summary>
+    /// File the check log is appended to.
+    /// </summary>
+    public required string LogFilePath { get; init; }
 }
 
 /// <summary>
