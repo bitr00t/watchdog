@@ -21,6 +21,7 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal(8, configuration.Options.MaxConcurrency);
         Assert.Null(configuration.Options.Rounds);
         Assert.Equal(2, configuration.Retry.MaxAttempts);
+        Assert.Equal("watchdog.log", configuration.LogFilePath);
 
         var endpoint = Assert.Single(configuration.Endpoints);
         Assert.Equal(200, endpoint.ExpectedStatus);
@@ -37,6 +38,7 @@ public sealed class ConfigurationLoaderTests
               "intervalSeconds": 15,
               "maxConcurrency": 3,
               "rounds": 2,
+              "logFile": "checks.log",
               "retry": { "maxAttempts": 4, "delayMilliseconds": 100 },
               "endpoints": [
                 {
@@ -57,6 +59,7 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal(2, configuration.Options.Rounds);
         Assert.Equal(4, configuration.Retry.MaxAttempts);
         Assert.Equal(TimeSpan.FromMilliseconds(100), configuration.Retry.Delay);
+        Assert.Equal("checks.log", configuration.LogFilePath);
 
         var endpoint = Assert.Single(configuration.Endpoints);
         Assert.Equal("a", endpoint.Id.Value);
