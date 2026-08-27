@@ -25,11 +25,14 @@ public sealed class CheckRecord
     /// Always stored in UTC.
     /// </summary>
     /// <remarks>
-    /// SQLite has no date type and keeps this as ISO text, so comparisons are lexicographic.
-    /// That is only correct as long as every row carries the same offset, which is why the
-    /// store normalizes to UTC on write rather than trusting the caller.
+    /// DateTime rather than DateTimeOffset, even though the domain uses the latter. SQLite
+    /// has no date type and keeps values as ISO text, so ordering is lexicographic, and a
+    /// column whose rows could carry different offsets would sort wrongly. The provider
+    /// refuses to compare or order DateTimeOffset for exactly that reason instead of
+    /// producing quietly incorrect results. Normalizing to UTC on write removes the problem
+    /// and the offset along with it.
     /// </remarks>
-    public DateTimeOffset StartedAt { get; set; }
+    public DateTime StartedAt { get; set; }
 
     public double LatencyMilliseconds { get; set; }
 

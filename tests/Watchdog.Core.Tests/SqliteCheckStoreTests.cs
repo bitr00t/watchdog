@@ -29,7 +29,7 @@ public sealed class SqliteCheckStoreTests : IAsyncLifetime
             .UseSqlite(_connection)
             .Options;
 
-        _store = new SqliteCheckStore(new PooledDbContextFactory<WatchdogDbContext>(options));
+        _store = new SqliteCheckStore(new TestContextFactory(options));
 
         await _store.InitializeAsync();
     }
@@ -140,4 +140,16 @@ public sealed class SqliteCheckStoreTests : IAsyncLifetime
                 })
             ],
         };
+	
+	/// <summary>
+    /// Hands out a fresh context per call, all sharing the one open in-memory connection.
+    /// </summary>
+    private sealed class TestContextFactory(DbContextOptions<WatchdogDbContext> options)
+        : IDbContextFactory<WatchdogDbContext>
+    {
+        public WatchdogDbContext CreateDbContext() => new(options);
+
+        public Task<WatchdogDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateDbContext());
+    }
 }

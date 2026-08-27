@@ -42,7 +42,7 @@ public sealed class SqliteCheckStore(IDbContextFactory<WatchdogDbContext> contex
         {
             EndpointId = result.Id.Value,
             RoundNumber = round.Number,
-            StartedAt = result.StartedAt.ToUniversalTime(),
+            StartedAt = result.StartedAt.UtcDateTime,
             LatencyMilliseconds = result.Latency.Milliseconds,
             StatusCode = result.StatusCode,
             IsSuccess = result.IsSuccess,
@@ -73,20 +73,35 @@ public sealed class SqliteCheckStore(IDbContextFactory<WatchdogDbContext> contex
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        var utc = since.ToUniversalTime();
+        var utc = since.UtcDateTime;
 
-        return await context.Checks
+        // Projected into an anonymous type rather than straight into EndpointSummary, so the
+        // stored UTC DateTime can be turned back into a DateTimeOffset afterwards. Building
+        // the offset inside the query would be one more thing the provider has to translate.
+        var rows = await context.Checks
             .Where(record => record.StartedAt >= utc)
             .GroupBy(record => record.EndpointId)
-            .Select(group => new EndpointSummary(
-                group.Key,
-                group.Count(),
-                group.Count(record => !record.IsSuccess),
-                group.Average(record => record.LatencyMilliseconds),
-                group.Max(record => record.StartedAt)))
-            .OrderBy(summary => summary.EndpointId)
+            .Select(group => new
+            {
+                EndpointId = group.Key,
+                Total = group.Count(),
+                Failures = group.Count(record => !record.IsSuccess),
+                AverageLatency = group.Average(record => record.LatencyMilliseconds),
+                LastCheckedAt = group.Max(record => record.StartedAt),
+            })
+            .OrderBy(row => row.EndpointId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        // Back in LINQ to Objects from here on.
+        return rows
+            .Select(row => new EndpointSummary(
+                row.EndpointId,
+                row.Total,
+                row.Failures,
+                row.AverageLatency,
+                new DateTimeOffset(row.LastCheckedAt, TimeSpan.Zero)))
+            .ToArray();
     }
 
     /// <summary>
@@ -164,7 +179,7 @@ public sealed class SqliteCheckStore(IDbContextFactory<WatchdogDbContext> contex
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        var cutoff = DateTimeOffset.UtcNow - retention;
+        var cutoff = DateTime.UtcNow - retention;
 
         return await context.Checks
             .Where(record => record.StartedAt < cutoff)
