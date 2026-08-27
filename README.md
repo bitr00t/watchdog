@@ -45,6 +45,7 @@ lists every problem it found.
   "maxConcurrency": 4,
   "rounds": 3,
   "logFile": "watchdog.log",
+  "metrics": { "enabled": true, "port": 9464, "path": "/metrics" },
   "retry": { "maxAttempts": 2, "delayMilliseconds": 250 },
   "endpoints": [
     {
@@ -62,12 +63,26 @@ Per endpoint, `expectedStatus`, `timeoutSeconds`, `bodyContains` and the pair
 `jsonPath`/`jsonEquals` are optional. Omitting `rounds` runs until cancelled. Comments and
 trailing commas are tolerated.
 
+## Metrics
+
+With `metrics.enabled` set, the statistics are exposed in the Prometheus text exposition
+format:
+
+```powershell
+curl http://localhost:9464/metrics
+```
+
+One gauge family per measurement, labelled by endpoint: `watchdog_up`,
+`watchdog_checks_retained`, `watchdog_check_failures`, `watchdog_check_success_ratio`,
+`watchdog_consecutive_failures`, `watchdog_latency_average_milliseconds` and
+`watchdog_latency_p95_milliseconds`. All of them describe the retained window, not the whole
+run. The listener binds to `localhost` only.
+
 ## Status
 
-Step 7: the application runs on the generic host. Program.cs is a pure composition root, the
-engine and its collaborators are resolved from the service container, and the console
-reporter, the file logger and the monitoring loop are three hosted services whose lifetime
-the host owns.
+Step 8: the statistics are exposed on a Prometheus scrape endpoint, served by a fourth
+hosted service. The monitoring loop publishes an immutable snapshot after every round, so
+the endpoint never reads the mutable history.
 
-Possible next steps: an HTTP or Prometheus endpoint exposing the statistics, persistence for
-the history, and hot reloading the configuration through IOptionsMonitor.
+Possible next steps: persistence for the history, hot reloading the configuration through
+IOptionsMonitor, and alerting rules on top of the exported metrics.
