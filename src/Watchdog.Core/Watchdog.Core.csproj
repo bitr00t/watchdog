@@ -5,6 +5,10 @@
     <AssemblyName>Watchdog.Core</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Polly.Core" Version="8.7.0" />
+  </ItemGroup>
+
   <!--
     TargetFramework, Nullable and LangVersion come from Directory.Build.props.
     This project intentionally has no NuGet dependencies.
