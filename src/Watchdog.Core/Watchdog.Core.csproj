@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Watchdog.Core</RootNamespace>
+    <AssemblyName>Watchdog.Core</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    TargetFramework, Nullable and LangVersion come from Directory.Build.props.
+    This project intentionally has no NuGet dependencies.
+  -->
+
+</Project>

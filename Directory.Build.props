@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    Shared build conventions for every project in the solution.
+    MSBuild picks this file up automatically by walking the directory tree upwards,
+    so the individual project files do not reference it explicitly.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Nullable reference types are on and violations fail the build. -->
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+
+    <!-- Adds the common using directives (System, System.Linq, System.Threading.Tasks, ...). -->
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

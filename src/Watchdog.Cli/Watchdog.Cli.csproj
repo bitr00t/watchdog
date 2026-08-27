@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Watchdog.Cli</RootNamespace>
+    <AssemblyName>watchdog</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Watchdog.Core\Watchdog.Core.csproj" />
+  </ItemGroup>
+
+</Project>
