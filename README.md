@@ -1,12 +1,34 @@
 # Watchdog
 
 A small command line tool that periodically probes HTTP endpoints: status code, response
-time and, optionally, an expected substring in the response body.
+time and, optionally, an assertion over the response body. Failed checks are retried,
+results are aggregated per endpoint, exposed to Prometheus and persisted to SQLite.
 
-The project is a learning exercise and deliberately leans on C# concepts that have no
-direct counterpart in Java: properties, LINQ, async/await, delegates and events, nullable
-reference types, structs as true value types, generics without type erasure and extension
-methods.
+The project is a learning exercise. It was written to pick up C# and .NET coming from about
+ten years of Java, and it deliberately leans on concepts that have no direct counterpart
+there: properties, LINQ and `IQueryable`, async/await and `IAsyncEnumerable`, delegates and
+events, nullable reference types, structs as true value types, generics without type
+erasure, and extension methods.
+
+That is also why the history is worth more than the current state of the code. It was built
+in nine steps, each one a branch and a pull request, each adding one idea and the tests for
+it. The pull requests carry the reasoning behind the design decisions, and the code is
+commented with the same intent: not what a line does, but why it looks the way it does in
+C# and not the way it would in Java.
+
+## How it was built
+
+| Step | What it added |
+| --- | --- |
+| 1 | A single probe: value types, records, nullable reference types, `HttpClient` |
+| 2 | Parallel execution on an interval, yielded as an `IAsyncEnumerable` |
+| 3 | A bounded history and LINQ statistics as extension methods |
+| 4 | Events with two independent subscribers, and Polly retries |
+| 5 | Typed body assertions, with per type metadata cached in a generic static class |
+| 6 | A validated configuration file instead of a hard coded endpoint list |
+| 7 | The generic host, dependency injection and hosted services |
+| 8 | A Prometheus scrape endpoint |
+| 9 | Persistence with EF Core and SQLite |
 
 ## Layout
 
@@ -15,7 +37,7 @@ methods.
 | `src/Watchdog.Core` | Domain logic, no console output |
 | `src/Watchdog.Persistence` | EF Core context and SQLite store |
 | `src/Watchdog.Cli` | Host, composition root and hosted services |
-| `tests/Watchdog.Core.Tests` | xUnit tests against a WireMock server |
+| `tests/Watchdog.Core.Tests` | xUnit tests against WireMock and SQLite |
 
 ## Requirements
 
@@ -65,17 +87,6 @@ Per endpoint, `expectedStatus`, `timeoutSeconds`, `bodyContains` and the pair
 `jsonPath`/`jsonEquals` are optional. Omitting `rounds` runs until cancelled. Comments and
 trailing commas are tolerated.
 
-## Storage
-
-With `storage.enabled` set, every round is written to a SQLite database. The schema is
-created on startup with `EnsureCreated`, and checks older than `retentionDays` are removed
-at the same time. Changing the model means deleting the file; a project that needs to keep
-its data would use EF Core migrations instead.
-
-The store also answers queries over the persisted history: an aggregate per endpoint since a
-point in time, the most recent failures of one endpoint, and a percentile over its
-latencies.
-
 ## Metrics
 
 With `metrics.enabled` set, the statistics are exposed in the Prometheus text exposition
@@ -91,11 +102,21 @@ One gauge family per measurement, labelled by endpoint: `watchdog_up`,
 `watchdog_latency_p95_milliseconds`. All of them describe the retained window, not the whole
 run. The listener binds to `localhost` only.
 
+## Storage
+
+With `storage.enabled` set, every round is written to a SQLite database. The schema is
+created on startup with `EnsureCreated`, and checks older than `retentionDays` are removed
+at the same time. Changing the model means deleting the file; a project that needs to keep
+its data would use EF Core migrations instead.
+
+The store also answers queries over the persisted history: an aggregate per endpoint since a
+point in time, the most recent failures of one endpoint, and a percentile over its
+latencies. The aggregation is translated to SQL rather than evaluated in memory, and the one
+query that cannot be translated crosses back into memory deliberately, after the filtering
+has already run in the database.
+
 ## Status
 
-Step 9: completed rounds are persisted to SQLite through EF Core, and the store answers
-aggregate queries that are translated to SQL rather than evaluated in memory.
-
-Possible next steps: EF Core migrations instead of EnsureCreated, hot reloading the
-configuration through IOptionsMonitor, and native AOT publishing, which would mean replacing
-the reflection based JSON handling with a source generator.
+Feature complete for what it set out to be. Possible next steps: source generated JSON and
+a native AOT build, EF Core migrations instead of `EnsureCreated`, and hot reloading the
+configuration through `IOptionsMonitor`.
