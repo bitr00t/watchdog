@@ -1,9 +1,11 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Watchdog.Cli;
 using Watchdog.Core;
+using Watchdog.Persistence;
 
 // Composition root. Everything below only registers types; nothing is constructed until the
 // host resolves the first hosted service.
@@ -79,6 +81,25 @@ builder.Services.AddSingleton<WatchdogEngine>();
 
 // Registration order is start order. Both subscribers have to be attached before the worker
 // produces its first round; shutdown runs in reverse, so they detach after it finishes.
+// AddDbContextFactory registers the factory as a singleton and the context itself as
+// transient, which is what a long running process needs: one short lived unit of work per
+// operation instead of a context that lives as long as the application.
+if (configuration.Storage.Enabled)
+{
+    builder.Services.AddDbContextFactory<WatchdogDbContext>(dbOptions =>
+        dbOptions.UseSqlite($"Data Source={configuration.Storage.DatabasePath}"));
+
+    builder.Services.AddSingleton<SqliteCheckStore>();
+    builder.Services.AddSingleton<ICheckResultStore>(provider =>
+        provider.GetRequiredService<SqliteCheckStore>());
+
+    builder.Services.AddHostedService<DatabaseInitializer>();
+}
+else
+{
+    builder.Services.AddSingleton<ICheckResultStore, NullCheckResultStore>();
+}
+
 builder.Services.AddHostedService<ConsoleReporter>();
 builder.Services.AddHostedService<FileLogger>();
 

@@ -76,6 +76,7 @@ public static class ConfigurationLoader
         var options = MapOptions(file, errors);
         var retry = MapRetry(file.Retry, errors);
         var metrics = MapMetrics(file.Metrics, errors);
+        var storage = MapStorage(file.Storage, errors);
 
         if (errors.Count > 0)
         {
@@ -89,6 +90,7 @@ public static class ConfigurationLoader
             Endpoints = endpoints,
             LogFilePath = string.IsNullOrWhiteSpace(file.LogFile) ? "watchdog.log" : file.LogFile,
             Metrics = metrics,
+            Storage = storage,
         };
     }
 
@@ -163,6 +165,24 @@ public static class ConfigurationLoader
             Enabled = metrics?.Enabled ?? false,
             Port = port is >= 1 and <= 65535 ? port : 9464,
             Path = path.StartsWith('/') ? path : "/metrics",
+        };
+    }
+
+    private static StorageConfiguration MapStorage(StorageFile? storage, List<string> errors)
+    {
+        var path = string.IsNullOrWhiteSpace(storage?.DatabasePath) ? "watchdog.db" : storage.DatabasePath;
+        var retentionDays = storage?.RetentionDays ?? 7;
+
+        if (retentionDays < 1)
+        {
+            errors.Add("storage.retentionDays must be at least 1.");
+        }
+
+        return new StorageConfiguration
+        {
+            Enabled = storage?.Enabled ?? false,
+            DatabasePath = path,
+            RetentionDays = Math.Max(retentionDays, 1),
         };
     }
 
@@ -292,7 +312,18 @@ public static class ConfigurationLoader
 
         public MetricsFile? Metrics { get; init; }
 
+        public StorageFile? Storage { get; init; }
+
         public IReadOnlyList<EndpointFile?>? Endpoints { get; init; }
+    }
+
+    internal sealed record StorageFile
+    {
+        public bool? Enabled { get; init; }
+
+        public string? DatabasePath { get; init; }
+
+        public int? RetentionDays { get; init; }
     }
 
     internal sealed record MetricsFile

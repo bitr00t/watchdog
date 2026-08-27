@@ -17,6 +17,23 @@ public sealed record WatchdogConfiguration
     public required string LogFilePath { get; init; }
 
     public required MetricsConfiguration Metrics { get; init; }
+
+    public required StorageConfiguration Storage { get; init; }
+}
+
+/// <summary>
+/// Settings of the SQLite check history.
+/// </summary>
+public sealed record StorageConfiguration
+{
+    public bool Enabled { get; init; }
+
+    public string DatabasePath { get; init; } = "watchdog.db";
+
+    /// <summary>
+    /// How long persisted checks are kept. Older rows are removed on startup.
+    /// </summary>
+    public int RetentionDays { get; init; } = 7;
 }
 
 /// <summary>

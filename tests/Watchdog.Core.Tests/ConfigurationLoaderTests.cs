@@ -25,6 +25,9 @@ public sealed class ConfigurationLoaderTests
         Assert.False(configuration.Metrics.Enabled);
         Assert.Equal(9464, configuration.Metrics.Port);
         Assert.Equal("/metrics", configuration.Metrics.Path);
+        Assert.False(configuration.Storage.Enabled);
+        Assert.Equal("watchdog.db", configuration.Storage.DatabasePath);
+        Assert.Equal(7, configuration.Storage.RetentionDays);
 
         var endpoint = Assert.Single(configuration.Endpoints);
         Assert.Equal(200, endpoint.ExpectedStatus);
@@ -43,6 +46,7 @@ public sealed class ConfigurationLoaderTests
               "rounds": 2,
               "logFile": "checks.log",
               "metrics": { "enabled": true, "port": 9500, "path": "/stats" },
+              "storage": { "enabled": true, "databasePath": "history.db", "retentionDays": 30 },
               "retry": { "maxAttempts": 4, "delayMilliseconds": 100 },
               "endpoints": [
                 {
@@ -67,6 +71,9 @@ public sealed class ConfigurationLoaderTests
         Assert.True(configuration.Metrics.Enabled);
         Assert.Equal(9500, configuration.Metrics.Port);
         Assert.Equal("/stats", configuration.Metrics.Path);
+        Assert.True(configuration.Storage.Enabled);
+        Assert.Equal("history.db", configuration.Storage.DatabasePath);
+        Assert.Equal(30, configuration.Storage.RetentionDays);
 
         var endpoint = Assert.Single(configuration.Endpoints);
         Assert.Equal("a", endpoint.Id.Value);
