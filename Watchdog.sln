@@ -4,6 +4,8 @@ VisualStudioVersion = 17.11.35222.181
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Watchdog.Core", "src\Watchdog.Core\Watchdog.Core.csproj", "{8F2A1C34-5B6D-4E7F-9A01-2B3C4D5E6F70}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Watchdog.Persistence", "src\Watchdog.Persistence\Watchdog.Persistence.csproj", "{5E7A9B12-3C4D-4E5F-8A6B-7C8D9E0F1A73}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Watchdog.Cli", "src\Watchdog.Cli\Watchdog.Cli.csproj", "{1D4E5F60-7A8B-4C9D-8E1F-2A3B4C5D6E71}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Watchdog.Core.Tests", "tests\Watchdog.Core.Tests\Watchdog.Core.Tests.csproj", "{3C5D7E90-1F2A-4B3C-9D4E-5F6A7B8C9D72}"
@@ -18,6 +20,10 @@ Global
 		{8F2A1C34-5B6D-4E7F-9A01-2B3C4D5E6F70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F2A1C34-5B6D-4E7F-9A01-2B3C4D5E6F70}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F2A1C34-5B6D-4E7F-9A01-2B3C4D5E6F70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E7A9B12-3C4D-4E5F-8A6B-7C8D9E0F1A73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E7A9B12-3C4D-4E5F-8A6B-7C8D9E0F1A73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E7A9B12-3C4D-4E5F-8A6B-7C8D9E0F1A73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E7A9B12-3C4D-4E5F-8A6B-7C8D9E0F1A73}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1D4E5F60-7A8B-4C9D-8E1F-2A3B4C5D6E71}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1D4E5F60-7A8B-4C9D-8E1F-2A3B4C5D6E71}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1D4E5F60-7A8B-4C9D-8E1F-2A3B4C5D6E71}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Watchdog.Persistence</RootNamespace>
+    <AssemblyName>Watchdog.Persistence</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Watchdog.Core\Watchdog.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    Add the provider with:
+      dotnet add src\Watchdog.Persistence package Microsoft.EntityFrameworkCore.Sqlite
+  -->
+
+</Project>
