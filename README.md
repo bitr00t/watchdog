@@ -18,8 +18,8 @@ methods.
 
 ## Requirements
 
-.NET SDK 9.0 or newer. For a different SDK version, adjust `TargetFramework` in
-`Directory.Build.props`, for example to `net10.0`.
+.NET SDK 10.0 or newer. For a different SDK version, adjust `TargetFramework` in
+`Directory.Build.props`.
 
 ## Build and run
 
@@ -35,6 +35,7 @@ two of the three demo endpoints are expected to fail. Ctrl+C stops it earlier.
 
 ## Status
 
-Step 3: results are retained per endpoint in a bounded history and aggregated into per
-endpoint statistics (success rate, average and p95 latency, current outage length). The CLI
-prints a summary once the run ends. Events and notification sinks follow in step 4.
+Step 4: the engine publishes StatusChanged and RoundCompleted events, and the CLI attaches
+two independent subscribers to them, a console reporter and a file logger writing
+`watchdog.log`. Failing checks are retried through a Polly pipeline before they count as a
+failure.
