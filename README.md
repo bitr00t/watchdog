@@ -13,6 +13,7 @@ methods.
 | Project | Purpose |
 | --- | --- |
 | `src/Watchdog.Core` | Domain logic, no console output |
+| `src/Watchdog.Persistence` | EF Core context and SQLite store |
 | `src/Watchdog.Cli` | Host, composition root and hosted services |
 | `tests/Watchdog.Core.Tests` | xUnit tests against a WireMock server |
 
@@ -46,6 +47,7 @@ lists every problem it found.
   "rounds": 3,
   "logFile": "watchdog.log",
   "metrics": { "enabled": true, "port": 9464, "path": "/metrics" },
+  "storage": { "enabled": true, "databasePath": "watchdog.db", "retentionDays": 7 },
   "retry": { "maxAttempts": 2, "delayMilliseconds": 250 },
   "endpoints": [
     {
@@ -62,6 +64,17 @@ Only `endpoints` with an `id` and a `url` is required; everything else has a def
 Per endpoint, `expectedStatus`, `timeoutSeconds`, `bodyContains` and the pair
 `jsonPath`/`jsonEquals` are optional. Omitting `rounds` runs until cancelled. Comments and
 trailing commas are tolerated.
+
+## Storage
+
+With `storage.enabled` set, every round is written to a SQLite database. The schema is
+created on startup with `EnsureCreated`, and checks older than `retentionDays` are removed
+at the same time. Changing the model means deleting the file; a project that needs to keep
+its data would use EF Core migrations instead.
+
+The store also answers queries over the persisted history: an aggregate per endpoint since a
+point in time, the most recent failures of one endpoint, and a percentile over its
+latencies.
 
 ## Metrics
 
@@ -80,9 +93,9 @@ run. The listener binds to `localhost` only.
 
 ## Status
 
-Step 8: the statistics are exposed on a Prometheus scrape endpoint, served by a fourth
-hosted service. The monitoring loop publishes an immutable snapshot after every round, so
-the endpoint never reads the mutable history.
+Step 9: completed rounds are persisted to SQLite through EF Core, and the store answers
+aggregate queries that are translated to SQL rather than evaluated in memory.
 
-Possible next steps: persistence for the history, hot reloading the configuration through
-IOptionsMonitor, and alerting rules on top of the exported metrics.
+Possible next steps: EF Core migrations instead of EnsureCreated, hot reloading the
+configuration through IOptionsMonitor, and native AOT publishing, which would mean replacing
+the reflection based JSON handling with a source generator.
