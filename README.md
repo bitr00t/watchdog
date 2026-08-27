@@ -30,11 +30,11 @@ dotnet test
 dotnet run --project src/Watchdog.Cli
 ```
 
-The sample run performs three rounds and exits with code 1 on purpose: two of the three
-demo endpoints are expected to fail. Ctrl+C stops it earlier.
+The sample run performs three rounds, prints a summary and exits with code 1 on purpose:
+two of the three demo endpoints are expected to fail. Ctrl+C stops it earlier.
 
 ## Status
 
-Step 2: all endpoints of a round are probed in parallel, bounded by a configurable
-concurrency limit, and the round repeats on an interval until a round limit is reached or
-the caller cancels. History, statistics and events follow in the next steps.
+Step 3: results are retained per endpoint in a bounded history and aggregated into per
+endpoint statistics (success rate, average and p95 latency, current outage length). The CLI
+prints a summary once the run ends. Events and notification sinks follow in step 4.
