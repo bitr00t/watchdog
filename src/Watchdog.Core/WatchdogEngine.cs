@@ -10,6 +10,30 @@ public sealed class WatchdogEngine(IEndpointProbe probe, WatchdogOptions? option
     private readonly IEndpointProbe _probe = probe ?? throw new ArgumentNullException(nameof(probe));
     private readonly WatchdogOptions _options = options ?? new WatchdogOptions();
 
+    // Last known state per endpoint. This makes the engine stateful: one instance drives
+    // one monitoring session and is not meant to be shared between concurrent sessions.
+    private readonly Dictionary<CheckId, CheckStatus> _lastStatus = [];
+
+    /// <summary>
+    /// Raised when an endpoint flips between healthy and failing, including the first
+    /// observation, which moves it away from <see cref="CheckStatus.Unknown"/>.
+    /// </summary>
+    /// <remarks>
+    /// The <c>event</c> keyword is what separates this from a public delegate field:
+    /// subscribers may only add and remove handlers, and nobody outside this class can
+    /// raise the event or clear the invocation list.
+    ///
+    /// Handlers run synchronously on the thread that enumerates the rounds, in subscription
+    /// order, and an exception in one handler prevents the remaining ones from running.
+    /// Subscribers are therefore expected to be quick and to swallow their own failures.
+    /// </remarks>
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
+
+    /// <summary>
+    /// Raised once per completed round, before the round is yielded to the consumer.
+    /// </summary>
+    public event EventHandler<RoundCompletedEventArgs>? RoundCompleted;
+
     /// <summary>
     /// Produces one <see cref="CheckRound"/> per pass until the configured number of rounds
     /// is reached or the caller cancels.
@@ -53,12 +77,16 @@ public sealed class WatchdogEngine(IEndpointProbe probe, WatchdogOptions? option
 
             var results = await RunRoundAsync(endpoints, cancellationToken).ConfigureAwait(false);
 
-            yield return new CheckRound
+            var round = new CheckRound
             {
                 Number = number,
                 StartedAt = startedAt,
                 Results = results,
             };
+
+            Publish(round);
+
+            yield return round;
 
             if (_options.Rounds is { } limit && number >= limit)
             {
@@ -101,6 +129,33 @@ public sealed class WatchdogEngine(IEndpointProbe probe, WatchdogOptions? option
 
         // WhenAll keeps the order of the input sequence, independent of completion order.
         return await Task.WhenAll(probes).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Notifies subscribers about status transitions and the completed round.
+    /// </summary>
+    private void Publish(CheckRound round)
+    {
+        foreach (var result in round.Results)
+        {
+            var current = result.IsSuccess ? CheckStatus.Healthy : CheckStatus.Failing;
+            var previous = _lastStatus.GetValueOrDefault(result.Id, CheckStatus.Unknown);
+
+            if (previous == current)
+            {
+                continue;
+            }
+
+            _lastStatus[result.Id] = current;
+
+            // ?.Invoke reads the delegate field once and calls it only when at least one
+            // handler is attached. Writing "if (StatusChanged != null) StatusChanged(...)"
+            // instead would leave a window in which the last handler unsubscribes between
+            // the check and the call, and the invocation would throw.
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs(previous, current, result));
+        }
+
+        RoundCompleted?.Invoke(this, new RoundCompletedEventArgs(round));
     }
 
     /// <summary>
