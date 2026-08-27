@@ -27,6 +27,15 @@ internal sealed class FakeEndpointProbe(
     public static FakeEndpointProbe AlwaysSucceeding() =>
         new((endpoint, _) => Task.FromResult(Success(endpoint)));
 
+    public static CheckResult Failure(EndpointConfig endpoint, string reason = "Status 503, expected 200") => new()
+    {
+        Id = endpoint.Id,
+        StartedAt = DateTimeOffset.UtcNow,
+        Latency = Latency.Zero,
+        StatusCode = 503,
+        FailureReason = reason,
+    };
+
     public static CheckResult Success(EndpointConfig endpoint) => new()
     {
         Id = endpoint.Id,
