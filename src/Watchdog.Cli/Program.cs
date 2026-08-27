@@ -20,6 +20,7 @@ var options = new WatchdogOptions
 };
 
 var engine = new WatchdogEngine(new HttpEndpointProbe(httpClient), options);
+var history = new CheckHistory(capacityPerEndpoint: 50);
 
 EndpointConfig[] endpoints =
 [
@@ -64,6 +65,27 @@ static string Format(CheckResult result)
     return result.FailureReason is null ? line : $"{line}  <- {result.FailureReason}";
 }
 
+static void PrintSummary(CheckHistory history)
+{
+    var summaries = history.Summarize();
+
+    if (summaries.Count == 0)
+    {
+        return;
+    }
+
+    Console.WriteLine("Summary");
+    Console.WriteLine($"{"endpoint",-18} {"checks",6} {"ok",7} {"avg",10} {"p95",10}  state");
+
+    foreach (var statistics in summaries)
+    {
+        Console.WriteLine(
+            $"{statistics.Id.Value,-18} {statistics.Total,6} {statistics.SuccessRate,7:P0} "
+            + $"{statistics.AverageLatency.Milliseconds,10:F1} {statistics.P95Latency.Milliseconds,10:F1}  "
+            + (statistics.IsHealthy ? "healthy" : $"{statistics.ConsecutiveFailures} failing in a row"));
+    }
+}
+
 Console.WriteLine($"Watching {endpoints.Length} endpoints every {options.Interval.TotalSeconds:F0} s");
 Console.WriteLine("Press Ctrl+C to stop.");
 Console.WriteLine();
@@ -76,6 +98,8 @@ try
     // this loop asks for it, so a slow consumer cannot pile up work in the background.
     await foreach (var round in engine.RunAsync(endpoints, applicationLifetime.Token))
     {
+        history.Add(round);
+
         Console.WriteLine(
             $"Round {round.Number} at {round.StartedAt.ToLocalTime():HH:mm:ss}, "
             + $"{round.FailureCount} of {round.Results.Count} failed, "
@@ -100,5 +124,7 @@ catch (OperationCanceledException)
     // two rounds ends the enumeration without an exception.
     Console.WriteLine("Stopped.");
 }
+
+PrintSummary(history);
 
 return failedRounds == 0 ? 0 : 1;
