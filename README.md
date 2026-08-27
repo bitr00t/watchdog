@@ -10,15 +10,15 @@ methods.
 
 ## Layout
 
-| Project | Purpose |
-| --- | --- |
-| `src/Watchdog.Core` | Domain logic, no console output |
-| `src/Watchdog.Cli` | Entry point and rendering |
+| Project                       | Purpose                               |
+| ----------------------------- | ------------------------------------- |
+| `src/Watchdog.Core`         | Domain logic, no console output       |
+| `src/Watchdog.Cli`          | Entry point and rendering             |
 | `tests/Watchdog.Core.Tests` | xUnit tests against a WireMock server |
 
 ## Requirements
 
-.NET SDK 9.0 or newer. For a different SDK version, adjust `TargetFramework` in
+.NET SDK 10.0 or newer. For a different SDK version, adjust `TargetFramework` in
 `Directory.Build.props`, for example to `net10.0`.
 
 ## Build and run
