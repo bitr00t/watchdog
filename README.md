@@ -35,7 +35,9 @@ two of the three demo endpoints are expected to fail. Ctrl+C stops it earlier.
 
 ## Status
 
-Step 4: the engine publishes StatusChanged and RoundCompleted events, and the CLI attaches
-two independent subscribers to them, a console reporter and a file logger writing
-`watchdog.log`. Failing checks are retried through a Polly pipeline before they count as a
-failure.
+Step 5, feature complete for the original scope. On top of step 4, an endpoint can carry a
+typed body assertion: the response is deserialized into a caller supplied type and checked
+with a predicate, with per type metadata cached in a generic static class.
+
+Possible next steps: a configuration file instead of the hard coded endpoint list, an HTTP
+or Prometheus endpoint exposing the statistics, and persistence for the history.
