@@ -1,3 +1,4 @@
+using Watchdog.Cli;
 using Watchdog.Core;
 
 // Top-level statements: no class, no Main method, no string array parameter. The compiler
@@ -19,8 +20,20 @@ var options = new WatchdogOptions
     Rounds = 3,
 };
 
-var engine = new WatchdogEngine(new HttpEndpointProbe(httpClient), options);
+// The retry decorator wraps the plain probe. Neither the engine nor the probe knows about
+// the other's existence, which is the whole point of IEndpointProbe.
+IEndpointProbe probe = new ResilientEndpointProbe(
+    new HttpEndpointProbe(httpClient),
+    maxRetryAttempts: 2,
+    delay: TimeSpan.FromMilliseconds(250));
+
+var engine = new WatchdogEngine(probe, options);
 var history = new CheckHistory(capacityPerEndpoint: 50);
+
+// Two subscribers that know nothing about each other. Removing either one changes nothing
+// about the engine or the other subscriber.
+using var reporter = new ConsoleReporter(engine);
+using var logger = new FileLogger(engine, "watchdog.log");
 
 EndpointConfig[] endpoints =
 [
@@ -43,27 +56,13 @@ EndpointConfig[] endpoints =
     },
 ];
 
-// Ctrl+C shuts down cleanly instead of killing the process. This is also the first
-// encounter with events: += attaches a handler, and callers cannot raise the event
-// themselves.
+// Ctrl+C shuts down cleanly instead of killing the process.
 using var applicationLifetime = new CancellationTokenSource();
 Console.CancelKeyPress += (_, eventArgs) =>
 {
     eventArgs.Cancel = true;
     applicationLifetime.Cancel();
 };
-
-static string Format(CheckResult result)
-{
-    var marker = result.IsSuccess ? "OK  " : "FAIL";
-    var status = result.StatusCode?.ToString() ?? "---";
-
-    // Alignment and number format live inside the interpolated string:
-    // ,-18 left aligned over 18 characters, ,9:F1 right aligned over 9 with one decimal.
-    var line = $"{marker} {result.Id.Value,-18} {status,4} {result.Latency.Milliseconds,9:F1} ms";
-
-    return result.FailureReason is null ? line : $"{line}  <- {result.FailureReason}";
-}
 
 static void PrintSummary(CheckHistory history)
 {
@@ -94,23 +93,12 @@ var failedRounds = 0;
 
 try
 {
-    // await foreach pulls one round at a time. The engine only starts the next round once
-    // this loop asks for it, so a slow consumer cannot pile up work in the background.
+    // Rendering moved into ConsoleReporter, so this loop only keeps the history and the
+    // exit code. await foreach still drives the schedule: the engine starts the next round
+    // only once this loop asks for it.
     await foreach (var round in engine.RunAsync(endpoints, applicationLifetime.Token))
     {
         history.Add(round);
-
-        Console.WriteLine(
-            $"Round {round.Number} at {round.StartedAt.ToLocalTime():HH:mm:ss}, "
-            + $"{round.FailureCount} of {round.Results.Count} failed, "
-            + $"slowest {round.SlowestLatency}");
-
-        foreach (var result in round.Results)
-        {
-            Console.WriteLine(Format(result));
-        }
-
-        Console.WriteLine();
 
         if (!round.AllSucceeded)
         {

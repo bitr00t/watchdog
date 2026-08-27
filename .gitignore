@@ -13,6 +13,9 @@
 *.userosscache
 *.sln.docstates
 
+# Runtime output
+*.log
+
 # Test results
 [Tt]est[Rr]esult*/
 *.trx
