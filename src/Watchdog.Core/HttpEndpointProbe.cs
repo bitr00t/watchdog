@@ -91,7 +91,8 @@ public sealed class HttpEndpointProbe(HttpClient httpClient) : IEndpointProbe
             return $"Body does not contain '{expected}'";
         }
 
-        return null;
+        // The typed assertion runs last because it is the most expensive check.
+        return endpoint.BodyAssertion?.Validate(body);
     }
 
     private static CheckResult Failed(

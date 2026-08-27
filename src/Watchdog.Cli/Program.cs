@@ -54,6 +54,17 @@ EndpointConfig[] endpoints =
         Url = new Uri("https://127.0.0.1:9/"),
         Timeout = TimeSpan.FromSeconds(2),
     },
+    new()
+    {
+        // A real JSON status endpoint, asserted through a typed predicate rather than a
+        // substring. The type argument is all the deserializer needs; no class token has to
+        // be threaded through the call.
+        Id = new CheckId("github-status"),
+        Url = new Uri("https://www.githubstatus.com/api/v2/status.json"),
+        BodyAssertion = BodyAssertion.Json<GitHubStatus>(
+            status => status.Status.Indicator == "none",
+            "GitHub reports no incident"),
+    },
 ];
 
 // Ctrl+C shuts down cleanly instead of killing the process.
@@ -116,3 +127,9 @@ catch (OperationCanceledException)
 PrintSummary(history);
 
 return failedRounds == 0 ? 0 : 1;
+
+// Types have to come after the top-level statements. Records match the JSON shape by
+// property name; the deserializer is configured to ignore casing.
+internal sealed record GitHubStatus(GitHubStatusDetail Status);
+
+internal sealed record GitHubStatusDetail(string Indicator, string Description);

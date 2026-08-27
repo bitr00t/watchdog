@@ -62,6 +62,31 @@ public sealed class HttpEndpointProbeTests : IDisposable
     }
 
     [Fact]
+    public async Task ProbeAsync_applies_the_typed_body_assertion()
+    {
+        _server
+            .Given(Request.Create().WithPath("/health").UsingGet())
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithBody("""{"status":"degraded","uptimeSeconds":7}"""));
+
+        var endpoint = Endpoint("/health") with
+        {
+            BodyAssertion = BodyAssertion.Json<HealthReport>(
+                report => report.Status == "healthy",
+                "status is healthy"),
+        };
+
+        var result = await Probe().ProbeAsync(endpoint);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Contains("status is healthy", result.FailureReason ?? string.Empty);
+    }
+
+    private sealed record HealthReport(string Status, int UptimeSeconds);
+
+    [Fact]
     public async Task ProbeAsync_reports_a_timeout_when_the_response_takes_too_long()
     {
         _server
