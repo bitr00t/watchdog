@@ -1,0 +1,36 @@
+{
+  // Comments and trailing commas are tolerated by the loader.
+  "intervalSeconds": 10,
+  "maxConcurrency": 4,
+  "rounds": 3,
+
+  "retry": {
+    "maxAttempts": 2,
+    "delayMilliseconds": 250
+  },
+
+  "endpoints": [
+    {
+      "id": "example-com",
+      "url": "https://example.com/",
+      "expectedStatus": 200,
+      "timeoutSeconds": 5,
+      "bodyContains": "Example Domain"
+    },
+    {
+      "id": "wrong-status",
+      "url": "https://example.com/does-not-exist"
+    },
+    {
+      "id": "unreachable",
+      "url": "https://127.0.0.1:9/",
+      "timeoutSeconds": 2
+    },
+    {
+      "id": "github-status",
+      "url": "https://www.githubstatus.com/api/v2/status.json",
+      "jsonPath": "/status/indicator",
+      "jsonEquals": "none"
+    }
+  ]
+}

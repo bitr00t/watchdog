@@ -4,6 +4,23 @@ using Watchdog.Core;
 // Top-level statements: no class, no Main method, no string array parameter. The compiler
 // generates the scaffolding. args, await and return (as the exit code) are still available.
 
+const string DefaultConfigurationPath = "watchdog.json";
+
+// args is available without declaring it. The first argument overrides the config path.
+var configurationPath = args.Length > 0 ? args[0] : DefaultConfigurationPath;
+
+WatchdogConfiguration configuration;
+
+try
+{
+    configuration = await ConfigurationLoader.LoadAsync(configurationPath);
+}
+catch (ConfigurationException exception)
+{
+    Console.Error.WriteLine(exception.Message);
+    return 2;
+}
+
 // Exactly one HttpClient for the entire lifetime of the application.
 using var httpClient = new HttpClient
 {
@@ -11,61 +28,20 @@ using var httpClient = new HttpClient
     Timeout = System.Threading.Timeout.InfiniteTimeSpan,
 };
 
-var options = new WatchdogOptions
-{
-    Interval = TimeSpan.FromSeconds(10),
-    MaxConcurrency = 4,
-
-    // Set this to null to keep going until Ctrl+C.
-    Rounds = 3,
-};
-
 // The retry decorator wraps the plain probe. Neither the engine nor the probe knows about
 // the other's existence, which is the whole point of IEndpointProbe.
 IEndpointProbe probe = new ResilientEndpointProbe(
     new HttpEndpointProbe(httpClient),
-    maxRetryAttempts: 2,
-    delay: TimeSpan.FromMilliseconds(250));
+    configuration.Retry.MaxAttempts,
+    configuration.Retry.Delay);
 
-var engine = new WatchdogEngine(probe, options);
+var engine = new WatchdogEngine(probe, configuration.Options);
 var history = new CheckHistory(capacityPerEndpoint: 50);
 
 // Two subscribers that know nothing about each other. Removing either one changes nothing
 // about the engine or the other subscriber.
 using var reporter = new ConsoleReporter(engine);
 using var logger = new FileLogger(engine, "watchdog.log");
-
-EndpointConfig[] endpoints =
-[
-    new()
-    {
-        Id = new CheckId("example-com"),
-        Url = new Uri("https://example.com/"),
-        BodyContains = "Example Domain",
-    },
-    new()
-    {
-        Id = new CheckId("wrong-status"),
-        Url = new Uri("https://example.com/does-not-exist"),
-    },
-    new()
-    {
-        Id = new CheckId("unreachable"),
-        Url = new Uri("https://127.0.0.1:9/"),
-        Timeout = TimeSpan.FromSeconds(2),
-    },
-    new()
-    {
-        // A real JSON status endpoint, asserted through a typed predicate rather than a
-        // substring. The type argument is all the deserializer needs; no class token has to
-        // be threaded through the call.
-        Id = new CheckId("github-status"),
-        Url = new Uri("https://www.githubstatus.com/api/v2/status.json"),
-        BodyAssertion = BodyAssertion.Json<GitHubStatus>(
-            status => status.Status.Indicator == "none",
-            "GitHub reports no incident"),
-    },
-];
 
 // Ctrl+C shuts down cleanly instead of killing the process.
 using var applicationLifetime = new CancellationTokenSource();
@@ -96,7 +72,9 @@ static void PrintSummary(CheckHistory history)
     }
 }
 
-Console.WriteLine($"Watching {endpoints.Length} endpoints every {options.Interval.TotalSeconds:F0} s");
+Console.WriteLine(
+    $"Watching {configuration.Endpoints.Count} endpoints from '{configurationPath}' "
+    + $"every {configuration.Options.Interval.TotalSeconds:F0} s");
 Console.WriteLine("Press Ctrl+C to stop.");
 Console.WriteLine();
 
@@ -107,7 +85,7 @@ try
     // Rendering moved into ConsoleReporter, so this loop only keeps the history and the
     // exit code. await foreach still drives the schedule: the engine starts the next round
     // only once this loop asks for it.
-    await foreach (var round in engine.RunAsync(endpoints, applicationLifetime.Token))
+    await foreach (var round in engine.RunAsync(configuration.Endpoints, applicationLifetime.Token))
     {
         history.Add(round);
 
@@ -127,9 +105,3 @@ catch (OperationCanceledException)
 PrintSummary(history);
 
 return failedRounds == 0 ? 0 : 1;
-
-// Types have to come after the top-level statements. Records match the JSON shape by
-// property name; the deserializer is configured to ignore casing.
-internal sealed record GitHubStatus(GitHubStatusDetail Status);
-
-internal sealed record GitHubStatusDetail(string Indicator, string Description);
